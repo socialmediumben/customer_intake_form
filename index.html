@@ -114,8 +114,22 @@
                         </div>
                     </div>
 
+                    <!-- Minors Section -->
                     <div class="mb-8">
-                        <h2 class="text-xl font-semibold text-slate-700 border-b pb-2 mb-4">2. About You</h2>
+                        <h2 class="text-xl font-semibold text-slate-700 border-b pb-2 mb-4">Minors</h2>
+                        <div id="minors-container">
+                            <!-- Dynamic minor forms will be injected here -->
+                        </div>
+                        <div id="add-minor-button-container" class="mt-4">
+                             <button type="button" id="add-minor-btn" class="bg-gray-200 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-300 transition-colors duration-300">
+                                Add Minor
+                            </button>
+                        </div>
+                    </div>
+
+
+                    <div class="mb-8">
+                        <h2 class="text-xl font-semibold text-slate-700 border-b pb-2 mb-4">2. About You (Guardian)</h2>
                         <div>
                             <label class="block text-sm font-medium text-slate-600 mb-2">What are your interests? (Select all that apply)</label>
                             <div id="interests-container" class="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm min-h-[6rem]">
@@ -139,7 +153,7 @@
                         <div class="mt-4">
                             <label class="flex items-center">
                                 <input type="checkbox" id="agree-waiver" name="agree-waiver" required class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                                <span class="ml-2 text-sm text-slate-700">I have read and agree to the terms.</span>
+                                <span class="ml-2 text-sm text-slate-700">I have read and agree to the terms for myself and any listed minors.</span>
                             </label>
                         </div>
                     </div>
@@ -174,6 +188,7 @@
         let squareAccessToken = null; 
         let legalNameAttributeKey = null;
         let newWaiverAttributeKey = null;
+        let minorCount = 0;
 
         // --- 2. ELEMENT SELECTORS ---
         const loginView = document.getElementById('login-view');
@@ -183,6 +198,9 @@
         const loginError = document.getElementById('login-error');
         const form = document.getElementById('intake-form');
         const submitBtn = document.getElementById('submit-btn');
+        const addMinorBtn = document.getElementById('add-minor-btn');
+        const minorsContainer = document.getElementById('minors-container');
+        const addMinorButtonContainer = document.getElementById('add-minor-button-container');
 
         // --- 3. FIREBASE INITIALIZATION ---
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'social-medium-waiver-app';
@@ -243,9 +261,6 @@
             }
         });
         
-        /**
-         * Fetches all custom attribute definitions to find keys for interests and legal name.
-         */
         async function initializeFormFromSquare() {
             if (!squareAccessToken) throw new Error("Square Access Token is not set.");
 
@@ -263,31 +278,26 @@
 
             if (!data.custom_attribute_definitions) {
                 console.warn('The "custom_attribute_definitions" key was not found in the response data.');
-                populateInterests([]); // Call with empty array
+                populateInterests([]);
                 return; 
             }
 
             const allAttributes = data.custom_attribute_definitions;
 
-            // Find the key for "Legal Name"
             const legalNameAttr = allAttributes.find(attr => attr.name === 'Legal Name');
             if (legalNameAttr) {
                 legalNameAttributeKey = legalNameAttr.key;
-                console.log("Found Legal Name attribute key:", legalNameAttributeKey);
             } else {
-                console.error('Could not find a custom attribute named "Legal Name" in your Square account.');
+                console.error('Could not find a custom attribute named "Legal Name".');
             }
 
-            // Find the key for "New Waiver"
             const newWaiverAttr = allAttributes.find(attr => attr.name === 'New Waiver');
             if (newWaiverAttr) {
                 newWaiverAttributeKey = newWaiverAttr.key;
-                console.log("Found New Waiver attribute key:", newWaiverAttributeKey);
             } else {
-                console.error('Could not find a custom attribute named "New Waiver" in your Square account.');
+                console.error('Could not find a custom attribute named "New Waiver".');
             }
 
-            // Filter for interests and populate them
             const interestAttributes = allAttributes
                 .filter(attr => attr.schema?.$ref?.includes('squareup.common.Boolean') && attr.name?.startsWith("T: "))
                 .map(attr => ({ key: attr.key, name: attr.name }));
@@ -295,9 +305,6 @@
             populateInterests(interestAttributes);
         }
 
-        /**
-         * Populates the form with interest checkboxes.
-         */
         function populateInterests(attributes) {
             const container = document.getElementById('interests-container');
             const loader = document.getElementById('interests-loader');
@@ -319,7 +326,37 @@
             fieldset.disabled = false;
         }
 
-        // --- 5. SIGNATURE PAD LOGIC ---
+        // --- 5. DYNAMIC MINOR FORM LOGIC ---
+        addMinorBtn.addEventListener('click', () => {
+            minorCount++;
+            const minorFormHTML = `
+                <div class="mt-6 p-4 border rounded-lg bg-gray-50" id="minor-section-${minorCount}">
+                    <h3 class="text-lg font-semibold text-slate-600 mb-4">Minor ${minorCount} Information</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label for="first-name-minor-${minorCount}" class="block text-sm font-medium text-slate-600 mb-1">Preferred Name</label>
+                            <input type="text" id="first-name-minor-${minorCount}" name="first-name-minor-${minorCount}" required class="w-full px-4 py-2 border border-slate-300 rounded-lg">
+                        </div>
+                        <div>
+                            <label for="last-name-minor-${minorCount}" class="block text-sm font-medium text-slate-600 mb-1">Last Name</label>
+                            <input type="text" id="last-name-minor-${minorCount}" name="last-name-minor-${minorCount}" required class="w-full px-4 py-2 border border-slate-300 rounded-lg">
+                        </div>
+                        <div>
+                            <label for="legal-name-minor-${minorCount}" class="block text-sm font-medium text-slate-600 mb-1">Legal Name</label>
+                            <input type="text" id="legal-name-minor-${minorCount}" name="legal-name-minor-${minorCount}" required class="w-full px-4 py-2 border border-slate-300 rounded-lg">
+                        </div>
+                        <div>
+                            <label for="birthday-minor-${minorCount}" class="block text-sm font-medium text-slate-600 mb-1">Birthday</label>
+                            <input type="date" id="birthday-minor-${minorCount}" name="birthday-minor-${minorCount}" required class="w-full px-4 py-2 border border-slate-300 rounded-lg">
+                        </div>
+                    </div>
+                </div>
+            `;
+            minorsContainer.insertAdjacentHTML('beforeend', minorFormHTML);
+            addMinorButtonContainer.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        });
+
+        // --- 6. SIGNATURE PAD LOGIC ---
         const canvas = document.getElementById('signature-canvas');
         const ctx = canvas.getContext('2d');
         let isDrawing = false, lastX = 0, lastY = 0;
@@ -357,7 +394,7 @@
         canvas.addEventListener('touchend', () => isDrawing = false);
         document.getElementById('clear-signature-btn').addEventListener('click', () => ctx.clearRect(0, 0, canvas.width, canvas.height));
         
-        // --- 6. FORM SUBMISSION LOGIC ---
+        // --- 7. FORM SUBMISSION LOGIC ---
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             if (isCanvasBlank()) { displayMessage('Signature is required.', 'error'); return; }
@@ -372,125 +409,117 @@
                 selectedInterestKeys.push(checkbox.value);
             });
 
-            const createCustomerPayload = {
+            // --- A. Process Adult ---
+            const adultPayload = {
                 idempotency_key: crypto.randomUUID(),
-                given_name: formData.get('first-name'), // This is now "Preferred Name"
+                given_name: formData.get('first-name'),
                 family_name: formData.get('last-name'),
                 email_address: formData.get('email'),
                 phone_number: formData.get('phone'),
                 birthday: formData.get('birthday'),
+                note: 'Primary Guardian'
             };
+            const adultLegalName = formData.get('legal-name');
+            const allPromises = [createAndProcessCustomer(adultPayload, adultLegalName, selectedInterestKeys)];
 
-            const legalName = formData.get('legal-name');
+            // --- B. Process Minors ---
+            for (let i = 1; i <= minorCount; i++) {
+                const minorEmail = `${adultPayload.email_address.split('@')[0]}+minor${i}@${adultPayload.email_address.split('@')[1]}`;
+                const minorPayload = {
+                    idempotency_key: crypto.randomUUID(),
+                    given_name: formData.get(`first-name-minor-${i}`),
+                    family_name: formData.get(`last-name-minor-${i}`),
+                    email_address: minorEmail, // Still required by Square, but phone is the link
+                    phone_number: adultPayload.phone_number,
+                    birthday: formData.get(`birthday-minor-${i}`),
+                    note: `Minor, linked to guardian at phone: ${adultPayload.phone_number}`
+                };
+                const minorLegalName = formData.get(`legal-name-minor-${i}`);
+                // Minors do not have interests, so pass an empty array
+                allPromises.push(createAndProcessCustomer(minorPayload, minorLegalName, []));
+            }
 
             try {
-                // --- STEP 1: CREATE CUSTOMER ---
-                const createResponse = await fetch(`${RENDER_BACKEND_URL}/api/v2/customers`, {
-                    method: 'POST',
-                    headers: { 
-                        'x-square-access-token': squareAccessToken,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(createCustomerPayload)
-                });
-
-                if (!createResponse.ok) {
-                    const errorData = await createResponse.json();
-                    throw new Error(`Square profile creation failed: ${errorData.errors?.[0]?.detail || createResponse.statusText}`);
-                }
-                
-                const createResult = await createResponse.json();
-                const customerId = createResult.customer?.id;
-
-                if (!customerId) {
-                    throw new Error("Could not retrieve customer ID after creation.");
-                }
-                console.log("Customer created in Square with ID:", customerId);
-
-                // --- SAVE WAIVER TO FIRESTORE ---
-                if (db) {
-                    const waiverData = { ...createCustomerPayload, legalName, agreedAt: new Date().toISOString(), signatureDataURL: canvas.toDataURL('image/png'), interests: selectedInterestKeys };
-                    delete waiverData.idempotency_key;
-                    await addDoc(collection(db, `/artifacts/${appId}/public/data/waivers`), waiverData);
-                    console.log("Waiver saved to Firestore.");
-                }
-
-                // --- STEP 2: UPSERT CUSTOM ATTRIBUTES (INDIVIDUALLY) ---
-                const upsertPromises = [];
-
-                // Add "New Waiver" update
-                if (newWaiverAttributeKey) {
-                    const waiverPayload = {
-                        idempotency_key: crypto.randomUUID(),
-                        custom_attribute: { value: true }
-                    };
-                    upsertPromises.push(
-                        fetch(`${RENDER_BACKEND_URL}/api/v2/customers/${customerId}/custom-attributes/${newWaiverAttributeKey}`, {
-                            method: 'POST',
-                            headers: { 'x-square-access-token': squareAccessToken, 'Content-Type': 'application/json' },
-                            body: JSON.stringify(waiverPayload)
-                        })
-                    );
-                }
-
-                // Add Legal Name to the list of updates
-                if (legalNameAttributeKey && legalName) {
-                    const legalNamePayload = {
-                        idempotency_key: crypto.randomUUID(),
-                        custom_attribute: { value: legalName }
-                    };
-                    upsertPromises.push(
-                        fetch(`${RENDER_BACKEND_URL}/api/v2/customers/${customerId}/custom-attributes/${legalNameAttributeKey}`, {
-                            method: 'POST',
-                            headers: { 'x-square-access-token': squareAccessToken, 'Content-Type': 'application/json' },
-                            body: JSON.stringify(legalNamePayload)
-                        })
-                    );
-                }
-
-                // Add Interests to the list of updates
-                selectedInterestKeys.forEach(key => {
-                    const interestPayload = {
-                        idempotency_key: crypto.randomUUID(),
-                        custom_attribute: { value: true }
-                    };
-                    upsertPromises.push(
-                        fetch(`${RENDER_BACKEND_URL}/api/v2/customers/${customerId}/custom-attributes/${key}`, {
-                            method: 'POST',
-                            headers: { 'x-square-access-token': squareAccessToken, 'Content-Type': 'application/json' },
-                            body: JSON.stringify(interestPayload)
-                        })
-                    );
-                });
-
-                if (upsertPromises.length > 0) {
-                    console.log("Upserting custom attributes...");
-                    const results = await Promise.all(upsertPromises);
-                    results.forEach(async (response) => {
-                        if (!response.ok) {
-                            const errorData = await response.json();
-                            console.error(`Failed to set a custom attribute:`, errorData);
-                        }
-                    });
-                     console.log("Custom attributes update process completed.");
-                }
+                await Promise.all(allPromises);
 
                 // --- SHOW SUCCESS ---
                 document.getElementById('app-container').innerHTML = `
                     <div class="text-center py-12">
                         <svg class="mx-auto h-12 w-12 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                         <h1 class="text-2xl font-bold text-slate-800 mt-4">Thank You!</h1>
-                        <p class="text-slate-600 mt-2">Intake form submitted and Square profile created.</p>
+                        <p class="text-slate-600 mt-2">All intake forms submitted and Square profiles created successfully.</p>
                     </div>`;
 
             } catch (error) {
                 console.error("Error during submission: ", error);
-                let userMessage = `An error occurred: ${error.message}.`;
-                displayMessage(userMessage, 'error');
+                displayMessage(`An error occurred: ${error.message}.`, 'error');
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Agree & Submit Waiver';
             }
         });
+
+        async function createAndProcessCustomer(customerPayload, legalName, interestKeys) {
+            // --- STEP 1: CREATE CUSTOMER ---
+            const createResponse = await fetch(`${RENDER_BACKEND_URL}/api/v2/customers`, {
+                method: 'POST',
+                headers: { 'x-square-access-token': squareAccessToken, 'Content-Type': 'application/json' },
+                body: JSON.stringify(customerPayload)
+            });
+
+            if (!createResponse.ok) {
+                const errorData = await createResponse.json();
+                throw new Error(`Square profile creation failed for ${customerPayload.given_name}: ${errorData.errors?.[0]?.detail || createResponse.statusText}`);
+            }
+            
+            const createResult = await createResponse.json();
+            const customerId = createResult.customer?.id;
+            if (!customerId) throw new Error("Could not retrieve customer ID after creation.");
+            console.log(`Customer ${customerPayload.given_name} created with ID:`, customerId);
+
+            // --- SAVE WAIVER TO FIRESTORE ---
+            if (db) {
+                const waiverData = { ...customerPayload, legalName, agreedAt: new Date().toISOString(), signatureDataURL: canvas.toDataURL('image/png'), interests: interestKeys };
+                delete waiverData.idempotency_key;
+                await addDoc(collection(db, `/artifacts/${appId}/public/data/waivers`), waiverData);
+            }
+
+            // --- STEP 2: UPSERT CUSTOM ATTRIBUTES ---
+            const upsertPromises = [];
+
+            // Add "New Waiver" update
+            if (newWaiverAttributeKey) {
+                upsertPromises.push(upsertCustomAttribute(customerId, newWaiverAttributeKey, true));
+            }
+            // Add Legal Name update
+            if (legalNameAttributeKey && legalName) {
+                upsertPromises.push(upsertCustomAttribute(customerId, legalNameAttributeKey, legalName));
+            }
+            // Add Interests updates (will be an empty array for minors)
+            interestKeys.forEach(key => {
+                upsertPromises.push(upsertCustomAttribute(customerId, key, true));
+            });
+
+            const results = await Promise.all(upsertPromises);
+            results.forEach(async (response, index) => {
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    console.error(`Failed to set a custom attribute:`, errorData);
+                }
+            });
+            console.log(`Custom attributes update process completed for ${customerPayload.given_name}.`);
+        }
+        
+        function upsertCustomAttribute(customerId, key, value) {
+            const upsertPayload = {
+                idempotency_key: crypto.randomUUID(),
+                custom_attribute: { value: value }
+            };
+            return fetch(`${RENDER_BACKEND_URL}/api/v2/customers/${customerId}/custom-attributes/${key}`, {
+                method: 'POST',
+                headers: { 'x-square-access-token': squareAccessToken, 'Content-Type': 'application/json' },
+                body: JSON.stringify(upsertPayload)
+            });
+        }
 
         // --- UTILITY FUNCTIONS ---
         function displayMessage(message, type = 'info') {
