@@ -310,19 +310,20 @@
 
             const allAttributes = data.custom_attribute_definitions;
 
-            const legalNameAttr = allAttributes.find(attr => attr.name === 'Legal Name');
+            // FIX: Use case-insensitive search for attribute names.
+            const legalNameAttr = allAttributes.find(attr => attr.name.toLowerCase() === 'legal name');
             if (legalNameAttr) legalNameAttributeKey = legalNameAttr.key;
             else console.error('Could not find a custom attribute named "Legal Name".');
 
-            const newWaiverAttr = allAttributes.find(attr => attr.name === 'New Waiver');
+            const newWaiverAttr = allAttributes.find(attr => attr.name.toLowerCase() === 'new waiver');
             if (newWaiverAttr) newWaiverAttributeKey = newWaiverAttr.key;
             else console.error('Could not find a custom attribute named "New Waiver".');
 
-            const adultAttr = allAttributes.find(attr => attr.name === 'Adult');
+            const adultAttr = allAttributes.find(attr => attr.name.toLowerCase() === 'adult');
             if (adultAttr) adultAttributeKey = adultAttr.key;
             else console.error('Could not find a custom attribute named "Adult".');
 
-            const minorAttr = allAttributes.find(attr => attr.name === 'Minor');
+            const minorAttr = allAttributes.find(attr => attr.name.toLowerCase() === 'minor');
             if (minorAttr) minorAttributeKey = minorAttr.key;
             else console.error('Could not find a custom attribute named "Minor".');
 
