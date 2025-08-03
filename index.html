@@ -96,8 +96,8 @@
                                 <input type="text" id="last-name" name="last-name" required class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
                             </div>
                              <div>
-                                <label for="legal-name" class="block text-sm font-medium text-slate-600 mb-1">Legal Name</label>
-                                <input type="text" id="legal-name" name="legal-name" required class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                                <label for="legal-name" class="block text-sm font-medium text-slate-600 mb-1">Legal Name <span class="text-slate-400">(If Different)</span></label>
+                                <input type="text" id="legal-name" name="legal-name" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
                             </div>
                              <div>
                                 <label for="birthday" class="block text-sm font-medium text-slate-600 mb-1">Birthday</label>
@@ -147,7 +147,31 @@
                             <summary class="text-blue-600 hover:underline">Click to Read Activity Waiver & Photo Release</summary>
                             <div class="waiver-box">
                                 <strong>THIS ACTIVITY WAIVER (this "Agreement") IS A RELEASE OF LIABILITY AND INDICATES YOUR ASSUMPTION OF THE DIRECT AND INHERENT RISKS ASSOCIATED WITH THE ACTIVITY.</strong><br><br>
-                                <!-- Full waiver text... -->
+                                <strong>BETWEEN:</strong><br>
+                                IN CONSIDERATION OF the covenants and agreements contained in this Agreement and other good and valuable consideration, the receipt of which is hereby acknowledged, the parties to this Agreement agree as follows:<br><br>
+                                <strong>Consideration</strong><br>
+                                Being of lawful age and in consideration of being permitted to participate in the activity described below, the Participant releases and forever discharges the Activity Provider, its owners, directors, officers, employees, agents, assigns, legal representatives and successors from all manner of actions, causes of action, debts, accounts, bonds, contracts, claims and demands for or by reason of any injury to person or property, including injury resulting in the death of the Participant, which has been or may be sustained as a consequence of the Participant's participation in the activity described below, and not withstanding that such damage, loss or injury may have been caused solely or partly by the negligence of the Activity Provider.<br>
+                                The Releasor understands that the Releasor would not be permitted to participate in the activity described below unless the Releasor signed this Agreement.<br><br>
+                                <strong>Details of Activity</strong><br>
+                                The Participant will participate in the following activity/s: crafting, building, making things, classes, etc. from The Shop Class LLC (DBA Social Medium)--including but not limited to, necessary rigorous and/or dangerous activity associated with crafting, glues and chemicals, electronics, using tool and blades, etc.) and acknowledges any inherent, implied, and necessary risks associated with the same.<br><br>
+                                <strong>Concurrent Release</strong><br>
+                                The Participant acknowledges that this Agreement is given with the express intention of effecting the extinguishment of certain obligations owed to the Participant and with the intention of binding the Participant's spouse, heirs, executors, administrators, legal representatives and assigns.<br><br>
+                                <strong>Fitness to Participate</strong><br>
+                                The Participant acknowledges that the Participant does not have any physical limitations, medical ailments, physical or mental disabilities that would limit or prevent the Participant from participating in the above mentioned activity. If required, the Participant will obtain a medical examination and clearance.<br><br>
+                                <strong>Full and Final Settlement</strong><br>
+                                The Participant hereby acknowledges and agrees that the Participant has carefully read this Agreement, that the Participant fully understands the same, and that the Participant is freely and voluntarily executing the same.<br>
+                                The Participant understands that by signing this Agreement, the Participant agrees to be forever prevented from suing or otherwise claiming against the Activity Provider for any property loss or personal injury that the Participant may sustain while participating in or preparing for the above noted activity.<br>
+                                The Participant has been given the opportunity and has been encouraged to seek independent legal advice prior to signing this Agreement.<br>
+                                This Agreement contains the entire agreement between the parties to this Agreement and the terms of this Agreement are contractual and not a mere recital.<br><br>
+                                <strong>Governing Law</strong><br>
+                                This Agreement will be construed in accordance with and governed by the laws of the State of Califonia.<br><br>
+                                <strong>Duration:</strong><br>
+                                For recurring participants, this agreement will apply to all activities occurring between the parties during the calendar year of the effective date of signature unless otherwise revoked in a writing provided by either party, to the other.<br><br>
+                                <strong>Photo and Video Release</strong><br>
+                                By signing this agreement, the signatory gives the Activity Provider authorization record the signatory on video, photos and other mediums and to distribute and reproduce the materials for the following purposes: Portfolio showcase, advertising, marketing, branding, educational, digital promotions, internet videos, online courses, media, other commercial or non-commercial purposes.<br><br>
+                                <strong>Age Verification</strong><br>
+                                By signing this agreement, the signatory expressly states that he/she is at least 18 years of age. The signatory also expressly states that they have authority to authorize participation of the minor in the above-mentioned activity/s and further agrees to indemnify and hold harmless The Shop Class LLC (DBA Social Medium) from all liability.<br><br>
+                                IN WITNESS WHEREOF the Participant and Activity Provider have duly affixed their signatures below.
                             </div>
                         </details>
                         <div class="mt-4">
@@ -188,6 +212,8 @@
         let squareAccessToken = null; 
         let legalNameAttributeKey = null;
         let newWaiverAttributeKey = null;
+        let adultAttributeKey = null;
+        let minorAttributeKey = null;
         let minorCount = 0;
 
         // --- 2. ELEMENT SELECTORS ---
@@ -277,7 +303,7 @@
             const data = await response.json();
 
             if (!data.custom_attribute_definitions) {
-                console.warn('The "custom_attribute_definitions" key was not found in the response data.');
+                console.warn('The "custom_attribute_definitions" key was not found.');
                 populateInterests([]);
                 return; 
             }
@@ -285,18 +311,20 @@
             const allAttributes = data.custom_attribute_definitions;
 
             const legalNameAttr = allAttributes.find(attr => attr.name === 'Legal Name');
-            if (legalNameAttr) {
-                legalNameAttributeKey = legalNameAttr.key;
-            } else {
-                console.error('Could not find a custom attribute named "Legal Name".');
-            }
+            if (legalNameAttr) legalNameAttributeKey = legalNameAttr.key;
+            else console.error('Could not find a custom attribute named "Legal Name".');
 
             const newWaiverAttr = allAttributes.find(attr => attr.name === 'New Waiver');
-            if (newWaiverAttr) {
-                newWaiverAttributeKey = newWaiverAttr.key;
-            } else {
-                console.error('Could not find a custom attribute named "New Waiver".');
-            }
+            if (newWaiverAttr) newWaiverAttributeKey = newWaiverAttr.key;
+            else console.error('Could not find a custom attribute named "New Waiver".');
+
+            const adultAttr = allAttributes.find(attr => attr.name === 'Adult');
+            if (adultAttr) adultAttributeKey = adultAttr.key;
+            else console.error('Could not find a custom attribute named "Adult".');
+
+            const minorAttr = allAttributes.find(attr => attr.name === 'Minor');
+            if (minorAttr) minorAttributeKey = minorAttr.key;
+            else console.error('Could not find a custom attribute named "Minor".');
 
             const interestAttributes = allAttributes
                 .filter(attr => attr.schema?.$ref?.includes('squareup.common.Boolean') && attr.name?.startsWith("T: "))
@@ -342,8 +370,8 @@
                             <input type="text" id="last-name-minor-${minorCount}" name="last-name-minor-${minorCount}" required class="w-full px-4 py-2 border border-slate-300 rounded-lg">
                         </div>
                         <div>
-                            <label for="legal-name-minor-${minorCount}" class="block text-sm font-medium text-slate-600 mb-1">Legal Name</label>
-                            <input type="text" id="legal-name-minor-${minorCount}" name="legal-name-minor-${minorCount}" required class="w-full px-4 py-2 border border-slate-300 rounded-lg">
+                            <label for="legal-name-minor-${minorCount}" class="block text-sm font-medium text-slate-600 mb-1">Legal Name <span class="text-slate-400">(If Different)</span></label>
+                            <input type="text" id="legal-name-minor-${minorCount}" name="legal-name-minor-${minorCount}" class="w-full px-4 py-2 border border-slate-300 rounded-lg">
                         </div>
                         <div>
                             <label for="birthday-minor-${minorCount}" class="block text-sm font-medium text-slate-600 mb-1">Birthday</label>
@@ -420,7 +448,7 @@
                 note: 'Primary Guardian'
             };
             const adultLegalName = formData.get('legal-name');
-            const allPromises = [createAndProcessCustomer(adultPayload, adultLegalName, selectedInterestKeys)];
+            const allPromises = [createAndProcessCustomer(adultPayload, adultLegalName, selectedInterestKeys, false)];
 
             // --- B. Process Minors ---
             for (let i = 1; i <= minorCount; i++) {
@@ -429,14 +457,13 @@
                     idempotency_key: crypto.randomUUID(),
                     given_name: formData.get(`first-name-minor-${i}`),
                     family_name: formData.get(`last-name-minor-${i}`),
-                    email_address: minorEmail, // Still required by Square, but phone is the link
+                    email_address: minorEmail,
                     phone_number: adultPayload.phone_number,
                     birthday: formData.get(`birthday-minor-${i}`),
                     note: `Minor, linked to guardian at phone: ${adultPayload.phone_number}`
                 };
                 const minorLegalName = formData.get(`legal-name-minor-${i}`);
-                // Minors do not have interests, so pass an empty array
-                allPromises.push(createAndProcessCustomer(minorPayload, minorLegalName, []));
+                allPromises.push(createAndProcessCustomer(minorPayload, minorLegalName, [], true));
             }
 
             try {
@@ -458,7 +485,7 @@
             }
         });
 
-        async function createAndProcessCustomer(customerPayload, legalName, interestKeys) {
+        async function createAndProcessCustomer(customerPayload, legalName, interestKeys, isMinor) {
             // --- STEP 1: CREATE CUSTOMER ---
             const createResponse = await fetch(`${RENDER_BACKEND_URL}/api/v2/customers`, {
                 method: 'POST',
@@ -478,7 +505,7 @@
 
             // --- SAVE WAIVER TO FIRESTORE ---
             if (db) {
-                const waiverData = { ...customerPayload, legalName, agreedAt: new Date().toISOString(), signatureDataURL: canvas.toDataURL('image/png'), interests: interestKeys };
+                const waiverData = { ...customerPayload, legalName, agreedAt: new Date().toISOString(), signatureDataURL: canvas.toDataURL('image/png'), interests: interestKeys, isMinor };
                 delete waiverData.idempotency_key;
                 await addDoc(collection(db, `/artifacts/${appId}/public/data/waivers`), waiverData);
             }
@@ -490,17 +517,24 @@
             if (newWaiverAttributeKey) {
                 upsertPromises.push(upsertCustomAttribute(customerId, newWaiverAttributeKey, true));
             }
+            // Add "Adult" or "Minor" status
+            if (isMinor && minorAttributeKey) {
+                upsertPromises.push(upsertCustomAttribute(customerId, minorAttributeKey, true));
+            } else if (!isMinor && adultAttributeKey) {
+                upsertPromises.push(upsertCustomAttribute(customerId, adultAttributeKey, true));
+            }
+
             // Add Legal Name update
             if (legalNameAttributeKey && legalName) {
                 upsertPromises.push(upsertCustomAttribute(customerId, legalNameAttributeKey, legalName));
             }
-            // Add Interests updates (will be an empty array for minors)
+            // Add Interests updates (only for adults)
             interestKeys.forEach(key => {
                 upsertPromises.push(upsertCustomAttribute(customerId, key, true));
             });
 
             const results = await Promise.all(upsertPromises);
-            results.forEach(async (response, index) => {
+            results.forEach(async (response) => {
                 if (!response.ok) {
                     const errorData = await response.json();
                     console.error(`Failed to set a custom attribute:`, errorData);
