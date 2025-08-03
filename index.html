@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Social Medium - Customer Intake Form</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .waiver-box {
+            height: 200px;
+            background-color: #f8fafc;
+            border: 1px solid #e2e8f0;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            overflow-y: auto;
+            font-size: 0.875rem;
+            line-height: 1.25rem;
+            color: #475569;
+        }
+        #signature-canvas {
+            border: 2px dashed #cbd5e1;
+            border-radius: 0.5rem;
+            cursor: crosshair;
+        }
+        .hidden {
+            display: none;
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3b82f6; /* blue-500 */
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-slate-100 flex items-center justify-center min-h-screen p-4 sm:p-6 lg:p-8">
+
+    <div id="app-container" class="w-full max-w-4xl bg-white p-8 rounded-2xl shadow-lg transition-all duration-500">
+        
+        <!-- View 1: Login Screen -->
+        <div id="login-view">
+            <div class="text-center">
+                <h1 class="text-3xl font-bold text-slate-800">Social Medium</h1>
+                <p class="text-slate-500 mt-2">Admin Setup</p>
+            </div>
+            <div class="mt-8">
+                <label for="square-token-input" class="block text-sm font-medium text-slate-600 mb-1">Square Access Token</label>
+                <input type="password" id="square-token-input" placeholder="Enter your Square Access Token" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                <p class="text-xs text-slate-500 mt-2">The token is used for this session only and is not stored.</p>
+                <div id="login-error" class="text-red-600 text-sm mt-2 hidden"></div>
+            </div>
+            <div class="mt-6 text-center">
+                <button id="login-btn" class="w-full bg-blue-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-blue-700 transition-colors duration-300 focus:outline-none focus:ring-4 focus:ring-blue-300 disabled:bg-slate-400">
+                    Load Intake Form
+                </button>
+            </div>
+        </div>
+
+        <!-- View 2: Main Application (Waiver Form) -->
+        <div id="main-app-view" class="hidden">
+            <div class="text-center mb-8">
+                <h1 class="text-3xl font-bold text-slate-800">Social Medium</h1>
+                <p class="text-slate-500 mt-2">New Member Intake & Waiver</p>
+            </div>
+
+            <form id="intake-form">
+                <fieldset id="form-fieldset">
+                    <div class="mb-8">
+                        <h2 class="text-xl font-semibold text-slate-700 border-b pb-2 mb-4">1. Personal Information</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label for="first-name" class="block text-sm font-medium text-slate-600 mb-1">First Name</label>
+                                <input type="text" id="first-name" name="first-name" required class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                            </div>
+                            <div>
+                                <label for="last-name" class="block text-sm font-medium text-slate-600 mb-1">Last Name</label>
+                                <input type="text" id="last-name" name="last-name" required class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                            </div>
+                            <div>
+                                <label for="email" class="block text-sm font-medium text-slate-600 mb-1">Email Address</label>
+                                <input type="email" id="email" name="email" required class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                            </div>
+                            <div>
+                                <label for="phone" class="block text-sm font-medium text-slate-600 mb-1">Phone Number</label>
+                                <input type="tel" id="phone" name="phone" required class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-8">
+                        <h2 class="text-xl font-semibold text-slate-700 border-b pb-2 mb-4">2. About You</h2>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-600 mb-2">What are your interests? (Select all that apply)</label>
+                            <div id="interests-container" class="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm min-h-[6rem]">
+                                <div id="interests-loader" class="flex items-center space-x-2 text-slate-500 col-span-full">
+                                    <div class="loader"></div>
+                                    <span>Verifying token and loading interests...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-8">
+                        <h2 class="text-xl font-semibold text-slate-700 border-b pb-2 mb-4">3. Agreements & Waiver</h2>
+                        <div class="waiver-box">
+                            <strong>Assumption of Risk, Release of Liability, and Indemnification Agreement...</strong>
+                            <!-- Full waiver text -->
+                        </div>
+                        <div class="mt-4">
+                            <label class="flex items-center">
+                                <input type="checkbox" id="agree-waiver" name="agree-waiver" required class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                <span class="ml-2 text-sm text-slate-700">I have read and agree to the terms.</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="mb-8">
+                        <h2 class="text-xl font-semibold text-slate-700 border-b pb-2 mb-4">4. Signature</h2>
+                        <div class="bg-slate-50 p-2 rounded-lg">
+                            <canvas id="signature-canvas" width="600" height="200"></canvas>
+                        </div>
+                        <button type="button" id="clear-signature-btn" class="mt-2 text-sm text-blue-600 hover:underline">Clear Signature</button>
+                    </div>
+
+                    <div class="mt-8 text-center">
+                        <button type="submit" id="submit-btn" class="bg-blue-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-blue-700 transition-colors duration-300 focus:outline-none focus:ring-4 focus:ring-blue-300 disabled:bg-slate-400 disabled:cursor-not-allowed">
+                            Agree & Submit Waiver
+                        </button>
+                    </div>
+                </fieldset>
+            </form>
+
+            <div id="status-message" class="hidden mt-6 p-4 rounded-lg text-center"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+
+        // --- 1. CONFIGURATION ---
+        const RENDER_BACKEND_URL = 'https://square-checkin-backend.onrender.com';
+        let squareAccessToken = null; 
+
+        // --- 2. ELEMENT SELECTORS ---
+        const loginView = document.getElementById('login-view');
+        const mainAppView = document.getElementById('main-app-view');
+        const loginBtn = document.getElementById('login-btn');
+        const tokenInput = document.getElementById('square-token-input');
+        const loginError = document.getElementById('login-error');
+        const form = document.getElementById('intake-form');
+        const submitBtn = document.getElementById('submit-btn');
+
+        // --- 3. FIREBASE INITIALIZATION ---
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'social-medium-waiver-app';
+        let firebaseConfig;
+        try {
+            firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        } catch (e) {
+            console.error("Firebase config is not a valid JSON string.", e);
+            firebaseConfig = {}; 
+        }
+
+        let db, auth;
+        if (Object.keys(firebaseConfig).length > 0) {
+            try {
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                setLogLevel('debug');
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (error) {
+                console.error("Error initializing Firebase:", error);
+                displayMessage('Error connecting to the database service.', 'error');
+            }
+        } else {
+            console.error("Firebase configuration is missing.");
+        }
+
+        // --- 4. LOGIN AND APP INITIALIZATION LOGIC ---
+        loginBtn.addEventListener('click', async () => {
+            const token = tokenInput.value;
+            if (!token) {
+                loginError.textContent = 'Access token cannot be empty.';
+                loginError.classList.remove('hidden');
+                return;
+            }
+            
+            loginBtn.disabled = true;
+            loginBtn.textContent = 'Verifying...';
+            loginError.classList.add('hidden');
+
+            squareAccessToken = token;
+
+            try {
+                await populateInterests();
+                loginView.classList.add('hidden');
+                mainAppView.classList.remove('hidden');
+                resizeCanvas();
+            } catch (error) {
+                loginError.innerHTML = `Failed to validate token. Please check the token.<br><span class="font-mono text-xs">${error.message}</span>`;
+                loginError.classList.remove('hidden');
+                squareAccessToken = null;
+                loginBtn.disabled = false;
+                loginBtn.textContent = 'Load Intake Form';
+            }
+        });
+        
+        /**
+         * Fetches custom attribute definitions via the Render.com proxy.
+         */
+        async function fetchSquareCustomAttributes() {
+            if (!squareAccessToken) throw new Error("Square Access Token is not set.");
+
+            const response = await fetch(`${RENDER_BACKEND_URL}/api/v2/customers/custom-attribute-definitions`, {
+                method: 'GET',
+                headers: {
+                    'x-square-access-token': squareAccessToken,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(`API Error: ${errorData.errors?.[0]?.detail || response.statusText}`);
+            }
+
+            const data = await response.json();
+
+            if (!data.custom_attribute_definitions) {
+                console.warn('The "custom_attribute_definitions" key was not found in the response data.');
+                return []; 
+            }
+
+            const filteredAttributes = data.custom_attribute_definitions
+                .filter(attr => {
+                    const isBoolean = attr.schema?.$ref?.includes('squareup.common.Boolean');
+                    const nameStartsWithT = attr.name && attr.name.startsWith("T: ");
+                    return isBoolean && nameStartsWithT;
+                });
+            
+            return filteredAttributes.map(attr => ({ key: attr.key, name: attr.name }));
+        }
+
+        /**
+         * Populates the form with checkboxes.
+         */
+        async function populateInterests() {
+            const container = document.getElementById('interests-container');
+            const loader = document.getElementById('interests-loader');
+            const fieldset = document.getElementById('form-fieldset');
+            
+            fieldset.disabled = true;
+
+            try {
+                const attributes = await fetchSquareCustomAttributes();
+                if(loader) loader.remove();
+
+                if (attributes.length === 0) {
+                    container.innerHTML = '<p class="text-slate-500 col-span-full">No "T: " interests found. Please check your Square custom attribute definitions.</p>';
+                } else {
+                     attributes.forEach(attr => {
+                        const displayName = attr.name.replace(/^T: /, '');
+                        const checkboxId = `interest-${attr.key}`;
+                        const wrapper = document.createElement('div');
+                        wrapper.innerHTML = `
+                            <label for="${checkboxId}" class="flex items-center p-2 rounded-lg hover:bg-slate-50 transition cursor-pointer">
+                                <input type="checkbox" name="interests" id="${checkboxId}" value="${attr.key}" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 mr-2">
+                                ${displayName}
+                            </label>
+                        `;
+                        container.appendChild(wrapper);
+                    });
+                }
+                fieldset.disabled = false;
+            } catch (error) {
+                console.error("Failed to load interests:", error);
+                if(loader) loader.remove();
+                container.innerHTML = `<p class="text-red-600 col-span-full font-medium">Error: Could not load interests list. See console for details.</p>`;
+                throw error;
+            }
+        }
+
+        // --- 5. SIGNATURE PAD LOGIC ---
+        const canvas = document.getElementById('signature-canvas');
+        const ctx = canvas.getContext('2d');
+        let isDrawing = false, lastX = 0, lastY = 0;
+
+        function resizeCanvas() {
+            if (!canvas.parentElement) return;
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCanvas.width = canvas.width; tempCanvas.height = canvas.height;
+            tempCtx.drawImage(canvas, 0, 0);
+            const container = canvas.parentElement;
+            canvas.width = container.clientWidth;
+            ctx.drawImage(tempCanvas, 0, 0, tempCanvas.width, tempCanvas.height, 0, 0, canvas.width, canvas.height);
+            ctx.lineCap = 'round'; ctx.strokeStyle = '#1e293b'; ctx.lineWidth = 3;
+        }
+        function draw(e) {
+            if (!isDrawing) return;
+            const rect = canvas.getBoundingClientRect();
+            const x = (e.clientX || e.touches[0].clientX) - rect.left;
+            const y = (e.clientY || e.touches[0].clientY) - rect.top;
+            ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.lineTo(x, y); ctx.stroke();
+            [lastX, lastY] = [x, y];
+        }
+        function startDrawing(e) {
+            isDrawing = true;
+            const rect = canvas.getBoundingClientRect();
+            [lastX, lastY] = [(e.clientX || e.touches[0].clientX) - rect.left, (e.clientY || e.touches[0].clientY) - rect.top];
+        }
+        canvas.addEventListener('mousedown', startDrawing);
+        canvas.addEventListener('mousemove', draw);
+        canvas.addEventListener('mouseup', () => isDrawing = false);
+        canvas.addEventListener('mouseout', () => isDrawing = false);
+        canvas.addEventListener('touchstart', (e) => { e.preventDefault(); startDrawing(e); });
+        canvas.addEventListener('touchmove', (e) => { e.preventDefault(); draw(e); });
+        canvas.addEventListener('touchend', () => isDrawing = false);
+        document.getElementById('clear-signature-btn').addEventListener('click', () => ctx.clearRect(0, 0, canvas.width, canvas.height));
+        
+        // --- 6. FORM SUBMISSION LOGIC ---
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (isCanvasBlank()) { displayMessage('Signature is required.', 'error'); return; }
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Submitting...';
+            displayMessage('Processing your submission...', 'info');
+
+            const formData = new FormData(form);
+            const selectedInterestKeys = [];
+            document.querySelectorAll('input[name="interests"]:checked').forEach(checkbox => {
+                selectedInterestKeys.push(checkbox.value);
+            });
+
+            const createCustomerPayload = {
+                idempotency_key: crypto.randomUUID(),
+                given_name: formData.get('first-name'),
+                family_name: formData.get('last-name'),
+                email_address: formData.get('email'),
+                phone_number: formData.get('phone'),
+            };
+
+            try {
+                // --- STEP 1: CREATE CUSTOMER ---
+                const createResponse = await fetch(`${RENDER_BACKEND_URL}/api/v2/customers`, {
+                    method: 'POST',
+                    headers: { 
+                        'x-square-access-token': squareAccessToken,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(createCustomerPayload)
+                });
+
+                if (!createResponse.ok) {
+                    const errorData = await createResponse.json();
+                    throw new Error(`Square profile creation failed: ${errorData.errors?.[0]?.detail || createResponse.statusText}`);
+                }
+                
+                const createResult = await createResponse.json();
+                const customerId = createResult.customer?.id;
+
+                if (!customerId) {
+                    throw new Error("Could not retrieve customer ID after creation.");
+                }
+                console.log("Customer created in Square with ID:", customerId);
+
+                // --- SAVE WAIVER TO FIRESTORE ---
+                if (db) {
+                    const waiverData = { ...createCustomerPayload, agreedAt: new Date().toISOString(), signatureDataURL: canvas.toDataURL('image/png'), interests: selectedInterestKeys };
+                    delete waiverData.idempotency_key;
+                    await addDoc(collection(db, `/artifacts/${appId}/public/data/waivers`), waiverData);
+                    console.log("Waiver saved to Firestore.");
+                }
+
+                // --- STEP 2: UPSERT CUSTOM ATTRIBUTES (INDIVIDUALLY) ---
+                if (selectedInterestKeys.length > 0) {
+                    console.log("Upserting custom attributes for customer:", customerId);
+                    
+                    const upsertPromises = selectedInterestKeys.map(key => {
+                        // FIX: Changed 'boolean_value' to 'value' to match the Square API specification.
+                        const upsertPayload = {
+                            idempotency_key: crypto.randomUUID(),
+                            custom_attribute: {
+                                value: true
+                            }
+                        };
+                        return fetch(`${RENDER_BACKEND_URL}/api/v2/customers/${customerId}/custom-attributes/${key}`, {
+                            method: 'POST',
+                            headers: { 
+                                'x-square-access-token': squareAccessToken,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(upsertPayload)
+                        });
+                    });
+
+                    const results = await Promise.all(upsertPromises);
+                    results.forEach(async (response, index) => {
+                        if (!response.ok) {
+                            const errorData = await response.json();
+                            console.error(`Failed to set custom attribute ${selectedInterestKeys[index]}:`, errorData);
+                        }
+                    });
+                     console.log("Custom attributes successfully upserted.");
+                }
+
+                // --- SHOW SUCCESS ---
+                document.getElementById('app-container').innerHTML = `
+                    <div class="text-center py-12">
+                        <svg class="mx-auto h-12 w-12 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        <h1 class="text-2xl font-bold text-slate-800 mt-4">Thank You!</h1>
+                        <p class="text-slate-600 mt-2">Intake form submitted and Square profile created.</p>
+                    </div>`;
+
+            } catch (error) {
+                console.error("Error during submission: ", error);
+                let userMessage = `An error occurred: ${error.message}.`;
+                displayMessage(userMessage, 'error');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Agree & Submit Waiver';
+            }
+        });
+
+        // --- UTILITY FUNCTIONS ---
+        function displayMessage(message, type = 'info') {
+            const el = document.getElementById('status-message');
+            el.innerHTML = message;
+            el.className = 'mt-6 p-4 rounded-lg text-center';
+            if (type === 'error') el.classList.add('bg-red-100', 'text-red-800');
+            else el.classList.add('bg-blue-100', 'text-blue-800');
+        }
+        
+        function isCanvasBlank() {
+            return !ctx.getImageData(0, 0, canvas.width, canvas.height).data.some(channel => channel !== 0);
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+
+    </script>
+</body>
+</html>
