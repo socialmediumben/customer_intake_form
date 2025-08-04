@@ -111,6 +111,8 @@
                                 <label for="phone" class="block text-sm font-medium text-slate-600 mb-1">Phone Number</label>
                                 <input type="tel" id="phone" name="phone" required class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
                             </div>
+                            <!-- Container for dynamically added optional fields -->
+                            <div id="dynamic-attributes-container" class="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6"></div>
                         </div>
                     </div>
 
@@ -215,6 +217,7 @@
         let adultAttributeKey = null;
         let minorAttributeKey = null;
         let minorCount = 0;
+        let dynamicAttributes = [];
 
         // --- 2. ELEMENT SELECTORS ---
         const loginView = document.getElementById('login-view');
@@ -277,7 +280,8 @@
                 await initializeFormFromSquare();
                 loginView.classList.add('hidden');
                 mainAppView.classList.remove('hidden');
-                resizeCanvas();
+                // FIX: Use requestAnimationFrame for a more reliable canvas resize.
+                requestAnimationFrame(resizeCanvas);
             } catch (error) {
                 loginError.innerHTML = `Failed to validate token. Please check the token.<br><span class="font-mono text-xs">${error.message}</span>`;
                 loginError.classList.remove('hidden');
@@ -289,28 +293,41 @@
         
         async function initializeFormFromSquare() {
             if (!squareAccessToken) throw new Error("Square Access Token is not set.");
+            
+            let allAttributes = [];
+            let cursor = null;
+            
+            do {
+                const url = new URL(`${RENDER_BACKEND_URL}/api/v2/customers/custom-attribute-definitions`);
+                if (cursor) {
+                    url.searchParams.append('cursor', cursor);
+                }
+                
+                const response = await fetch(url.toString(), {
+                    method: 'GET',
+                    headers: { 'x-square-access-token': squareAccessToken, 'Content-Type': 'application/json' }
+                });
 
-            const response = await fetch(`${RENDER_BACKEND_URL}/api/v2/customers/custom-attribute-definitions`, {
-                method: 'GET',
-                headers: { 'x-square-access-token': squareAccessToken, 'Content-Type': 'application/json' }
-            });
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(`API Error: ${errorData.errors?.[0]?.detail || response.statusText}`);
+                }
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(`API Error: ${errorData.errors?.[0]?.detail || response.statusText}`);
-            }
+                const data = await response.json();
+                if (data.custom_attribute_definitions) {
+                    allAttributes.push(...data.custom_attribute_definitions);
+                }
+                cursor = data.cursor;
 
-            const data = await response.json();
+            } while (cursor);
 
-            if (!data.custom_attribute_definitions) {
-                console.warn('The "custom_attribute_definitions" key was not found.');
+
+            if (allAttributes.length === 0) {
+                console.warn('No custom attribute definitions found.');
                 populateInterests([]);
                 return; 
             }
 
-            const allAttributes = data.custom_attribute_definitions;
-
-            // FIX: Use case-insensitive search for attribute names.
             const legalNameAttr = allAttributes.find(attr => attr.name.toLowerCase() === 'legal name');
             if (legalNameAttr) legalNameAttributeKey = legalNameAttr.key;
             else console.error('Could not find a custom attribute named "Legal Name".');
@@ -332,6 +349,9 @@
                 .map(attr => ({ key: attr.key, name: attr.name }));
             
             populateInterests(interestAttributes);
+
+            dynamicAttributes = allAttributes.filter(attr => attr.name?.startsWith("B: ") || attr.name?.startsWith("W: "));
+            populateDynamicAttributes(dynamicAttributes);
         }
 
         function populateInterests(attributes) {
@@ -353,6 +373,21 @@
                 });
             }
             fieldset.disabled = false;
+        }
+
+        function populateDynamicAttributes(attributes) {
+            const container = document.getElementById('dynamic-attributes-container');
+            attributes.forEach(attr => {
+                const displayName = attr.name.replace(/^(B: |W: )/, '');
+                const inputId = `dynamic-${attr.key}`;
+                const fieldHTML = `
+                    <div>
+                        <label for="${inputId}" class="block text-sm font-medium text-slate-600 mb-1">${displayName} <span class="text-slate-400">(Optional)</span></label>
+                        <input type="text" id="${inputId}" name="${attr.key}" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                    </div>
+                `;
+                container.insertAdjacentHTML('beforeend', fieldHTML);
+            });
         }
 
         // --- 5. DYNAMIC MINOR FORM LOGIC ---
@@ -438,7 +473,14 @@
                 selectedInterestKeys.push(checkbox.value);
             });
 
-            // --- A. Process Adult ---
+            const dynamicAttributeValues = {};
+            dynamicAttributes.forEach(attr => {
+                const value = formData.get(attr.key);
+                if (value) {
+                    dynamicAttributeValues[attr.key] = value;
+                }
+            });
+
             const adultPayload = {
                 idempotency_key: crypto.randomUUID(),
                 given_name: formData.get('first-name'),
@@ -449,9 +491,8 @@
                 note: 'Primary Guardian'
             };
             const adultLegalName = formData.get('legal-name');
-            const allPromises = [createAndProcessCustomer(adultPayload, adultLegalName, selectedInterestKeys, false)];
+            const allPromises = [createAndProcessCustomer(adultPayload, adultLegalName, selectedInterestKeys, false, dynamicAttributeValues)];
 
-            // --- B. Process Minors ---
             for (let i = 1; i <= minorCount; i++) {
                 const minorEmail = `${adultPayload.email_address.split('@')[0]}+minor${i}@${adultPayload.email_address.split('@')[1]}`;
                 const minorPayload = {
@@ -464,13 +505,12 @@
                     note: `Minor, linked to guardian at phone: ${adultPayload.phone_number}`
                 };
                 const minorLegalName = formData.get(`legal-name-minor-${i}`);
-                allPromises.push(createAndProcessCustomer(minorPayload, minorLegalName, [], true));
+                allPromises.push(createAndProcessCustomer(minorPayload, minorLegalName, [], true, {}));
             }
 
             try {
                 await Promise.all(allPromises);
 
-                // --- SHOW SUCCESS ---
                 document.getElementById('app-container').innerHTML = `
                     <div class="text-center py-12">
                         <svg class="mx-auto h-12 w-12 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
@@ -486,8 +526,7 @@
             }
         });
 
-        async function createAndProcessCustomer(customerPayload, legalName, interestKeys, isMinor) {
-            // --- STEP 1: CREATE CUSTOMER ---
+        async function createAndProcessCustomer(customerPayload, legalName, interestKeys, isMinor, dynamicAttrs) {
             const createResponse = await fetch(`${RENDER_BACKEND_URL}/api/v2/customers`, {
                 method: 'POST',
                 headers: { 'x-square-access-token': squareAccessToken, 'Content-Type': 'application/json' },
@@ -504,35 +543,23 @@
             if (!customerId) throw new Error("Could not retrieve customer ID after creation.");
             console.log(`Customer ${customerPayload.given_name} created with ID:`, customerId);
 
-            // --- SAVE WAIVER TO FIRESTORE ---
             if (db) {
-                const waiverData = { ...customerPayload, legalName, agreedAt: new Date().toISOString(), signatureDataURL: canvas.toDataURL('image/png'), interests: interestKeys, isMinor };
+                const waiverData = { ...customerPayload, legalName, agreedAt: new Date().toISOString(), signatureDataURL: canvas.toDataURL('image/png'), interests: interestKeys, isMinor, otherAttributes: dynamicAttrs };
                 delete waiverData.idempotency_key;
                 await addDoc(collection(db, `/artifacts/${appId}/public/data/waivers`), waiverData);
             }
 
-            // --- STEP 2: UPSERT CUSTOM ATTRIBUTES ---
             const upsertPromises = [];
 
-            // Add "New Waiver" update
-            if (newWaiverAttributeKey) {
-                upsertPromises.push(upsertCustomAttribute(customerId, newWaiverAttributeKey, true));
+            if (newWaiverAttributeKey) upsertPromises.push(upsertCustomAttribute(customerId, newWaiverAttributeKey, true));
+            if (isMinor && minorAttributeKey) upsertPromises.push(upsertCustomAttribute(customerId, minorAttributeKey, true));
+            else if (!isMinor && adultAttributeKey) upsertPromises.push(upsertCustomAttribute(customerId, adultAttributeKey, true));
+            if (legalNameAttributeKey && legalName) upsertPromises.push(upsertCustomAttribute(customerId, legalNameAttributeKey, legalName));
+            interestKeys.forEach(key => upsertPromises.push(upsertCustomAttribute(customerId, key, true)));
+            
+            for (const key in dynamicAttrs) {
+                upsertPromises.push(upsertCustomAttribute(customerId, key, dynamicAttrs[key]));
             }
-            // Add "Adult" or "Minor" status
-            if (isMinor && minorAttributeKey) {
-                upsertPromises.push(upsertCustomAttribute(customerId, minorAttributeKey, true));
-            } else if (!isMinor && adultAttributeKey) {
-                upsertPromises.push(upsertCustomAttribute(customerId, adultAttributeKey, true));
-            }
-
-            // Add Legal Name update
-            if (legalNameAttributeKey && legalName) {
-                upsertPromises.push(upsertCustomAttribute(customerId, legalNameAttributeKey, legalName));
-            }
-            // Add Interests updates (only for adults)
-            interestKeys.forEach(key => {
-                upsertPromises.push(upsertCustomAttribute(customerId, key, true));
-            });
 
             const results = await Promise.all(upsertPromises);
             results.forEach(async (response) => {
@@ -566,6 +593,7 @@
         }
         
         function isCanvasBlank() {
+            if (canvas.width === 0 || canvas.height === 0) return true;
             return !ctx.getImageData(0, 0, canvas.width, canvas.height).data.some(channel => channel !== 0);
         }
 
