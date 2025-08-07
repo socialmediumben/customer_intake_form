@@ -498,12 +498,11 @@
 
         async function processCustomer(customerPayload, legalName, interestKeys, isMinor, dynamicAttrs) {
             // --- STEP 1: SEARCH FOR/CREATE/UPDATE CUSTOMER ---
+            const cleanedPhoneNumber = customerPayload.phone_number.replace(/\D/g, '');
             const searchPayload = {
                 query: {
                     filter: {
-                        phone_number: { exact: customerPayload.phone_number },
-                        given_name: { fuzzy: customerPayload.given_name },
-                        family_name: { fuzzy: customerPayload.family_name }
+                        phone_number: { fuzzy: cleanedPhoneNumber }
                     }
                 }
             };
@@ -519,10 +518,18 @@
             const searchResult = await searchResponse.json();
             let customerId;
             let customerVersion;
+            let existingCustomer = null;
 
             if (searchResult.customers && searchResult.customers.length > 0) {
+                // Find a customer with a matching name from the results
+                existingCustomer = searchResult.customers.find(c => 
+                    c.given_name.toLowerCase() === customerPayload.given_name.toLowerCase() &&
+                    c.family_name.toLowerCase() === customerPayload.family_name.toLowerCase()
+                );
+            }
+
+            if (existingCustomer) {
                 // Customer exists, update them
-                const existingCustomer = searchResult.customers[0];
                 customerId = existingCustomer.id;
                 customerVersion = existingCustomer.version;
                 console.log(`Customer ${customerPayload.given_name} found with ID: ${customerId}. Updating...`);
