@@ -442,7 +442,6 @@
             });
 
             const adultPayload = {
-                idempotency_key: crypto.randomUUID(),
                 given_name: formData.get('first-name'),
                 family_name: formData.get('last-name'),
                 email_address: formData.get('email'),
@@ -451,12 +450,11 @@
                 note: 'Primary Guardian'
             };
             const adultLegalName = formData.get('legal-name');
-            const allPromises = [createAndProcessCustomer(adultPayload, adultLegalName, selectedInterestKeys, false, dynamicAttributeValues)];
+            const allPromises = [processCustomer(adultPayload, adultLegalName, selectedInterestKeys, false, dynamicAttributeValues)];
 
             for (let i = 1; i <= minorCount; i++) {
                 const minorEmail = `${adultPayload.email_address.split('@')[0]}+minor${i}@${adultPayload.email_address.split('@')[1]}`;
                 const minorPayload = {
-                    idempotency_key: crypto.randomUUID(),
                     given_name: formData.get(`first-name-minor-${i}`),
                     family_name: formData.get(`last-name-minor-${i}`),
                     email_address: minorEmail,
@@ -465,7 +463,7 @@
                     note: `Minor, linked to guardian at phone: ${adultPayload.phone_number}`
                 };
                 const minorLegalName = formData.get(`legal-name-minor-${i}`);
-                allPromises.push(createAndProcessCustomer(minorPayload, minorLegalName, [], true, {}));
+                allPromises.push(processCustomer(minorPayload, minorLegalName, [], true, {}));
             }
 
             try {
@@ -486,29 +484,74 @@
             }
         });
 
-        async function createAndProcessCustomer(customerPayload, legalName, interestKeys, isMinor, dynamicAttrs) {
-            const createResponse = await fetch(`${RENDER_BACKEND_URL}/api/v2/customers`, {
+        async function processCustomer(customerPayload, legalName, interestKeys, isMinor, dynamicAttrs) {
+            // --- STEP 1: SEARCH FOR/CREATE/UPDATE CUSTOMER ---
+            const searchPayload = {
+                query: {
+                    filter: {
+                        phone_number: { exact: customerPayload.phone_number },
+                        given_name: { fuzzy: customerPayload.given_name },
+                        family_name: { fuzzy: customerPayload.family_name }
+                    }
+                }
+            };
+
+            const searchResponse = await fetch(`${RENDER_BACKEND_URL}/api/v2/customers/search`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(customerPayload)
+                body: JSON.stringify(searchPayload)
             });
 
-            if (!createResponse.ok) {
-                const errorData = await createResponse.json();
-                throw new Error(`Square profile creation failed for ${customerPayload.given_name}: ${errorData.errors?.[0]?.detail || createResponse.statusText}`);
-            }
+            if (!searchResponse.ok) throw new Error('Failed to search for customer.');
             
-            const createResult = await createResponse.json();
-            const customerId = createResult.customer?.id;
-            if (!customerId) throw new Error("Could not retrieve customer ID after creation.");
-            console.log(`Customer ${customerPayload.given_name} created with ID: ${customerId}`);
+            const searchResult = await searchResponse.json();
+            let customerId;
+            let customerVersion;
 
+            if (searchResult.customers && searchResult.customers.length > 0) {
+                // Customer exists, update them
+                const existingCustomer = searchResult.customers[0];
+                customerId = existingCustomer.id;
+                customerVersion = existingCustomer.version;
+                console.log(`Customer ${customerPayload.given_name} found with ID: ${customerId}. Updating...`);
+
+                const updatePayload = { ...customerPayload, version: customerVersion };
+                const updateResponse = await fetch(`${RENDER_BACKEND_URL}/api/v2/customers/${customerId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(updatePayload)
+                });
+                if (!updateResponse.ok) throw new Error(`Failed to update customer ${customerPayload.given_name}.`);
+
+            } else {
+                // Customer does not exist, create them
+                console.log(`Customer ${customerPayload.given_name} not found. Creating...`);
+                customerPayload.idempotency_key = crypto.randomUUID();
+                const createResponse = await fetch(`${RENDER_BACKEND_URL}/api/v2/customers`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(customerPayload)
+                });
+
+                if (!createResponse.ok) {
+                    const errorData = await createResponse.json();
+                    throw new Error(`Square profile creation failed for ${customerPayload.given_name}: ${errorData.errors?.[0]?.detail || createResponse.statusText}`);
+                }
+                
+                const createResult = await createResponse.json();
+                customerId = createResult.customer?.id;
+                if (!customerId) throw new Error("Could not retrieve customer ID after creation.");
+                console.log(`Customer ${customerPayload.given_name} created with ID: ${customerId}`);
+            }
+
+            // --- SAVE WAIVER TO FIRESTORE ---
             if (db) {
-                const waiverData = { ...customerPayload, legalName, agreedAt: new Date().toISOString(), signatureDataURL: canvas.toDataURL('image/png'), interests: interestKeys, isMinor, otherAttributes: dynamicAttrs };
-                delete waiverData.idempotency_key;
+                const waiverData = { ...customerPayload, customerId, legalName, agreedAt: new Date().toISOString(), signatureDataURL: canvas.toDataURL('image/png'), interests: interestKeys, isMinor, otherAttributes: dynamicAttrs };
+                if(waiverData.idempotency_key) delete waiverData.idempotency_key;
                 await addDoc(collection(db, `/artifacts/${appId}/public/data/waivers`), waiverData);
             }
 
+            // --- STEP 2: UPSERT CUSTOM ATTRIBUTES ---
             const upsertPromises = [];
 
             if (newWaiverAttributeKey) upsertPromises.push(upsertCustomAttribute(customerId, newWaiverAttributeKey, true));
