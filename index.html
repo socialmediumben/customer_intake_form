@@ -391,6 +391,7 @@
             }
             const container = canvas.parentElement;
             canvas.width = container.clientWidth;
+            canvas.height = container.clientWidth / 3; 
             if (tempCanvas.width > 0 && tempCanvas.height > 0) {
                 ctx.drawImage(tempCanvas, 0, 0, tempCanvas.width, tempCanvas.height, 0, 0, canvas.width, canvas.height);
             }
