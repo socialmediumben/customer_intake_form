@@ -56,34 +56,15 @@
 
     <div id="app-container" class="w-full max-w-4xl bg-white p-8 rounded-2xl shadow-lg transition-all duration-500">
         
-        <!-- View 1: Login Screen -->
-        <div id="login-view">
-            <div class="text-center">
-                <h1 class="text-3xl font-bold text-slate-800">Social Medium</h1>
-                <p class="text-slate-500 mt-2">Admin Setup</p>
-            </div>
-            <div class="mt-8">
-                <label for="square-token-input" class="block text-sm font-medium text-slate-600 mb-1">Square Access Token</label>
-                <input type="password" id="square-token-input" placeholder="Enter your Square Access Token" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
-                <p class="text-xs text-slate-500 mt-2">The token is used for this session only and is not stored.</p>
-                <div id="login-error" class="text-red-600 text-sm mt-2 hidden"></div>
-            </div>
-            <div class="mt-6 text-center">
-                <button id="login-btn" class="w-full bg-blue-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-blue-700 transition-colors duration-300 focus:outline-none focus:ring-4 focus:ring-blue-300 disabled:bg-slate-400">
-                    Load Intake Form
-                </button>
-            </div>
-        </div>
-
-        <!-- View 2: Main Application (Waiver Form) -->
-        <div id="main-app-view" class="hidden">
+        <!-- Main Application View -->
+        <div id="main-app-view">
             <div class="text-center mb-8">
                 <h1 class="text-3xl font-bold text-slate-800">Social Medium</h1>
                 <p class="text-slate-500 mt-2">New Member Intake & Waiver</p>
             </div>
 
             <form id="intake-form">
-                <fieldset id="form-fieldset">
+                <fieldset id="form-fieldset" disabled>
                     <div class="mb-8">
                         <h2 class="text-xl font-semibold text-slate-700 border-b pb-2 mb-4">1. Personal Information</h2>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -137,7 +118,7 @@
                             <div id="interests-container" class="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm min-h-[6rem]">
                                 <div id="interests-loader" class="flex items-center space-x-2 text-slate-500 col-span-full">
                                     <div class="loader"></div>
-                                    <span>Verifying token and loading interests...</span>
+                                    <span>Loading options...</span>
                                 </div>
                             </div>
                         </div>
@@ -211,7 +192,6 @@
 
         // --- 1. CONFIGURATION ---
         const RENDER_BACKEND_URL = 'https://square-checkin-backend.onrender.com';
-        let squareAccessToken = null; 
         let legalNameAttributeKey = null;
         let newWaiverAttributeKey = null;
         let adultAttributeKey = null;
@@ -220,80 +200,57 @@
         let dynamicAttributes = [];
 
         // --- 2. ELEMENT SELECTORS ---
-        const loginView = document.getElementById('login-view');
-        const mainAppView = document.getElementById('main-app-view');
-        const loginBtn = document.getElementById('login-btn');
-        const tokenInput = document.getElementById('square-token-input');
-        const loginError = document.getElementById('login-error');
         const form = document.getElementById('intake-form');
         const submitBtn = document.getElementById('submit-btn');
         const addMinorBtn = document.getElementById('add-minor-btn');
         const minorsContainer = document.getElementById('minors-container');
         const addMinorButtonContainer = document.getElementById('add-minor-button-container');
 
-        // --- 3. FIREBASE INITIALIZATION ---
+        // --- 3. FIREBASE & APP INITIALIZATION ---
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'social-medium-waiver-app';
-        let firebaseConfig;
-        try {
-            firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-        } catch (e) {
-            console.error("Firebase config is not a valid JSON string.", e);
-            firebaseConfig = {}; 
-        }
-
         let db, auth;
-        if (Object.keys(firebaseConfig).length > 0) {
+        
+        async function main() {
+            let firebaseConfig;
             try {
-                const app = initializeApp(firebaseConfig);
-                db = getFirestore(app);
-                auth = getAuth(app);
-                setLogLevel('debug');
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
+                firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+            } catch (e) {
+                console.error("Firebase config is not a valid JSON string.", e);
+                firebaseConfig = {}; 
+            }
+
+            if (Object.keys(firebaseConfig).length > 0) {
+                try {
+                    const app = initializeApp(firebaseConfig);
+                    db = getFirestore(app);
+                    auth = getAuth(app);
+                    setLogLevel('debug');
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        await signInWithCustomToken(auth, __initial_auth_token);
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+                } catch (error) {
+                    console.error("Error initializing Firebase:", error);
+                    displayMessage('Error connecting to the database service.', 'error');
                 }
-            } catch (error) {
-                console.error("Error initializing Firebase:", error);
-                displayMessage('Error connecting to the database service.', 'error');
+            } else {
+                console.error("Firebase configuration is missing.");
             }
-        } else {
-            console.error("Firebase configuration is missing.");
-        }
-
-        // --- 4. LOGIN AND APP INITIALIZATION LOGIC ---
-        loginBtn.addEventListener('click', async () => {
-            const token = tokenInput.value;
-            if (!token) {
-                loginError.textContent = 'Access token cannot be empty.';
-                loginError.classList.remove('hidden');
-                return;
-            }
-            
-            loginBtn.disabled = true;
-            loginBtn.textContent = 'Verifying...';
-            loginError.classList.add('hidden');
-
-            squareAccessToken = token;
 
             try {
                 await initializeFormFromSquare();
-                loginView.classList.add('hidden');
-                mainAppView.classList.remove('hidden');
-                // FIX: Use requestAnimationFrame for a more reliable canvas resize.
                 requestAnimationFrame(resizeCanvas);
             } catch (error) {
-                loginError.innerHTML = `Failed to validate token. Please check the token.<br><span class="font-mono text-xs">${error.message}</span>`;
-                loginError.classList.remove('hidden');
-                squareAccessToken = null;
-                loginBtn.disabled = false;
-                loginBtn.textContent = 'Load Intake Form';
+                const loader = document.getElementById('interests-loader');
+                if(loader) loader.parentElement.innerHTML = `<p class="text-red-600 col-span-full font-medium">Error: Could not load form configuration from server.<br><span class="text-xs text-slate-500">${error.message}</span></p>`;
+                console.error("Initialization failed:", error);
             }
-        });
+        }
+        
+        document.addEventListener('DOMContentLoaded', main);
         
         async function initializeFormFromSquare() {
-            if (!squareAccessToken) throw new Error("Square Access Token is not set.");
-            
             let allAttributes = [];
             let cursor = null;
             
@@ -305,7 +262,7 @@
                 
                 const response = await fetch(url.toString(), {
                     method: 'GET',
-                    headers: { 'x-square-access-token': squareAccessToken, 'Content-Type': 'application/json' }
+                    headers: { 'Content-Type': 'application/json' }
                 });
 
                 if (!response.ok) {
@@ -320,7 +277,6 @@
                 cursor = data.cursor;
 
             } while (cursor);
-
 
             if (allAttributes.length === 0) {
                 console.warn('No custom attribute definitions found.');
@@ -426,14 +382,18 @@
         let isDrawing = false, lastX = 0, lastY = 0;
 
         function resizeCanvas() {
-            if (!canvas.parentElement) return;
+            if (!canvas.parentElement || canvas.offsetParent === null) return;
             const tempCanvas = document.createElement('canvas');
             const tempCtx = tempCanvas.getContext('2d');
             tempCanvas.width = canvas.width; tempCanvas.height = canvas.height;
-            tempCtx.drawImage(canvas, 0, 0);
+            if (canvas.width > 0 && canvas.height > 0) {
+                tempCtx.drawImage(canvas, 0, 0);
+            }
             const container = canvas.parentElement;
             canvas.width = container.clientWidth;
-            ctx.drawImage(tempCanvas, 0, 0, tempCanvas.width, tempCanvas.height, 0, 0, canvas.width, canvas.height);
+            if (tempCanvas.width > 0 && tempCanvas.height > 0) {
+                ctx.drawImage(tempCanvas, 0, 0, tempCanvas.width, tempCanvas.height, 0, 0, canvas.width, canvas.height);
+            }
             ctx.lineCap = 'round'; ctx.strokeStyle = '#1e293b'; ctx.lineWidth = 3;
         }
         function draw(e) {
@@ -529,7 +489,7 @@
         async function createAndProcessCustomer(customerPayload, legalName, interestKeys, isMinor, dynamicAttrs) {
             const createResponse = await fetch(`${RENDER_BACKEND_URL}/api/v2/customers`, {
                 method: 'POST',
-                headers: { 'x-square-access-token': squareAccessToken, 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(customerPayload)
             });
 
@@ -541,7 +501,7 @@
             const createResult = await createResponse.json();
             const customerId = createResult.customer?.id;
             if (!customerId) throw new Error("Could not retrieve customer ID after creation.");
-            console.log(`Customer ${customerPayload.given_name} created with ID:`, customerId);
+            console.log(`Customer ${customerPayload.given_name} created with ID: ${customerId}`);
 
             if (db) {
                 const waiverData = { ...customerPayload, legalName, agreedAt: new Date().toISOString(), signatureDataURL: canvas.toDataURL('image/png'), interests: interestKeys, isMinor, otherAttributes: dynamicAttrs };
@@ -555,19 +515,22 @@
             if (isMinor && minorAttributeKey) upsertPromises.push(upsertCustomAttribute(customerId, minorAttributeKey, true));
             else if (!isMinor && adultAttributeKey) upsertPromises.push(upsertCustomAttribute(customerId, adultAttributeKey, true));
             if (legalNameAttributeKey && legalName) upsertPromises.push(upsertCustomAttribute(customerId, legalNameAttributeKey, legalName));
-            interestKeys.forEach(key => upsertPromises.push(upsertCustomAttribute(customerId, key, true)));
+            
+            for (const key of interestKeys) {
+                upsertPromises.push(upsertCustomAttribute(customerId, key, true));
+            }
             
             for (const key in dynamicAttrs) {
                 upsertPromises.push(upsertCustomAttribute(customerId, key, dynamicAttrs[key]));
             }
 
             const results = await Promise.all(upsertPromises);
-            results.forEach(async (response) => {
+            for (const response of results) {
                 if (!response.ok) {
                     const errorData = await response.json();
-                    console.error(`Failed to set a custom attribute:`, errorData);
+                    console.error('Failed to set a custom attribute:', errorData);
                 }
-            });
+            }
             console.log(`Custom attributes update process completed for ${customerPayload.given_name}.`);
         }
         
@@ -578,7 +541,7 @@
             };
             return fetch(`${RENDER_BACKEND_URL}/api/v2/customers/${customerId}/custom-attributes/${key}`, {
                 method: 'POST',
-                headers: { 'x-square-access-token': squareAccessToken, 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(upsertPayload)
             });
         }
